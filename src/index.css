@@ -599,3 +599,12 @@ h1, h2, h3 { margin: 0 0 8px; }
     grid-template-columns: 1fr;
   }
 }
+/* Mobile polish (safe to add) */
+html, body, #root { overflow-x: hidden; }
+
+@media (max-width: 420px) {
+  .wrap { max-width: none; padding: 0 8px 16px; margin: 12px auto; }
+  .card { padding: 12px; border-radius: 12px; }
+  .toolbar { flex-direction: column; gap: 8px; }
+  input, select, button { min-height: 44px; font-size: 16px; }
+}
