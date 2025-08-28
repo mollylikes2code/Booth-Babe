@@ -13,16 +13,21 @@ export default function Landing() {
   ];
 
   return (
-    <div className="wrap">
-      <div className="landing-box">
-        <h1 className="landing-title">Welcome to Booth Babe</h1>
-        <p className="landing-sub">Choose where you’d like to go:</p>
+    <div className="min-h-screen text-white">
+      <div className="wrap">
+        <header className="card card-gradient" style={{ textAlign: "center" }}>
+          <h1 className="landing-title">Welcome to Booth Babe</h1>
+          <p className="muted">Choose where you’d like to go:</p>
+        </header>
 
-        <div className="landing-grid">
+        <div
+          className="grid"
+          style={{ gap: 20, marginTop: 24, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}
+        >
           {tiles.map(({ to, img, label }) => (
-            <Link key={to} to={to} className="landing-tile">
-              <img src={img} alt={label} className="landing-img" />
-              <span className="landing-label">{label}</span>
+            <Link key={to} to={to} className="card card-gradient" style={{ textAlign: "center" }}>
+              <img src={img} alt={label} className="mx-auto mb-3 h-16 w-16" />
+              <span className="text-lg font-semibold">{label}</span>
             </Link>
           ))}
         </div>
