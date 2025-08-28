@@ -530,3 +530,72 @@ h1, h2, h3 { margin: 0 0 8px; }
 .drawer {
   overflow-y: auto;
 }
+.card-gradient {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.15),
+    rgba(59, 130, 246, 0.1)
+  );
+  backdrop-filter: blur(8px);
+}
+/* ----- Mobile comfort tweaks ----- */
+
+/* Small phones (≤ 420px) */
+@media (max-width: 420px) {
+  /* Use the full width, reduce side padding */
+  .wrap {
+    max-width: none;
+    margin: 12px auto;
+    padding: 0 10px 16px;
+  }
+
+  /* Cards a bit tighter so nothing feels squished */
+  .card {
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.28);
+  }
+
+  /* Stack toolbar actions and make buttons easy to tap */
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .toolbar-actions {
+    width: 100%;
+  }
+  .toolbar-actions button {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 44px; /* thumb-friendly */
+  }
+
+  /* Inputs: larger tap targets */
+  input, select, button {
+    min-height: 44px;
+    font-size: 16px; /* avoids iOS zoom on focus */
+  }
+
+  /* Tables: slightly smaller text and tighter cells */
+  table { font-size: 13px; }
+  th, td { padding: 8px 8px; }
+
+  /* Landing tiles: 2 columns on tiny screens */
+  .landing-grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .landing-tile {
+    padding: 12px !important; /* in case it inherits .card padding */
+  }
+}
+
+/* Compact phones (≤ 360px): go to a single column for tiles */
+@media (max-width: 360px) {
+  .landing-grid {
+    grid-template-columns: 1fr;
+  }
+}
