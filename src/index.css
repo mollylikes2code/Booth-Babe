@@ -1,0 +1,532 @@
+/* ================= Booth Babe – Core Styles ================ */
+
+/* --- Color tokens (pastel galaxy) --- */
+:root {
+  --text: #ffffff;
+  --text-dark: #0b0b18;
+
+  --plasma-500: #a855f7;
+  --lavender:    #b9a7e1;
+  --deep-blue:   #3b4d9a;
+  --sky-blue:    #7ec3f6;
+  --soft-pink:   #f5b0cf;
+  --peach:       #ffceb8;
+  --star-yellow: #ffe28a;
+  --aqua:        #b0f4ef;
+
+  --glass-dark:   rgba(10, 12, 28, 0.55);
+  --glass-card:   rgba(255, 255, 255, 0.45);
+  --glass-stroke: rgba(255, 255, 255, 0.18);
+  --glass-shadow: rgba(168, 85, 247, 0.35);
+}
+
+/* --- Base reset --- */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+
+  /* 🌌 Static wallpaper */
+  background: #0b0b18 url("/wallpapers/galaxy-wallpaper-02.png") no-repeat center center fixed;
+  background-size: cover;
+}
+
+/* ================= Layout ================= */
+.wrap {
+  width: 90%;
+  max-width: 980px;
+  margin: 24px auto;
+  padding: 0 16px 32px;
+}
+
+.content-box {
+  /* 🌌 pastel galaxy gradient */
+  background: linear-gradient(
+    135deg,
+    rgba(245, 176, 207, 0.35),  /* soft pink */
+    rgba(185, 167, 225, 0.35),  /* lavender */
+    rgba(176, 244, 239, 0.35),  /* aqua */
+    rgba(255, 226, 138, 0.25)   /* star yellow */
+  );
+  border: 2px solid var(--lavender);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 24px var(--glass-shadow);
+  padding: 24px;
+  margin-top: 16px;
+}
+.card {
+  background: linear-gradient(
+  160deg,
+  rgba(75, 0, 130, 0.55),
+  rgba(139, 0, 90, 0.50),
+  rgba(25, 25, 112, 0.55),
+  rgba(185, 167, 225, 0.35) /* lavender tie-in */
+);
+
+  border: 2px solid rgba(185, 167, 225, 0.35); /* lavender border */
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 24px var(--glass-shadow);
+  padding: 24px;
+  margin-top: 16px;
+}
+
+
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ================= Forms ================= */
+.row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.help { opacity: 0.75; font-size: 12px; }
+
+input, select {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border: 1px solid var(--glass-stroke);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+  min-height: 38px;
+}
+input::placeholder { color: rgba(255, 255, 255, 0.6); }
+input:focus, select:focus {
+  border-color: rgba(34, 211, 238, 0.6);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.22);
+}
+
+select {
+  color-scheme: dark;
+  background: var(--glass-dark);
+  color: var(--text);
+  border: 1px solid var(--glass-stroke);
+}
+select option, select optgroup {
+  background-color: rgba(10, 12, 28, 0.92);
+  color: var(--text);
+}
+select option:checked {
+  background-color: rgba(168, 85, 247, 0.35);
+  color: var(--text);
+}
+select:focus {
+  border-color: rgba(168, 85, 247, 0.7);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.25);
+}
+
+/* ================= Buttons ================= */
+button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-weight: 600;
+  transition: transform 120ms ease, filter 120ms ease, background 120ms ease;
+}
+button:active { transform: scale(0.97); }
+
+.primary {
+  color: #fff;
+  background: var(--plasma-500);
+  box-shadow: 0 0 24px var(--glass-shadow);
+}
+.primary:hover { filter: brightness(1.05); }
+
+.secondary {
+  color: #22d3ee;
+  background: transparent;
+  border: 1px solid rgba(34, 211, 238, 0.5);
+}
+.secondary:hover { background: rgba(34, 211, 238, 0.12); }
+
+.success {
+  color: #0b0;
+  background: rgba(0, 255, 120, 0.12);
+  border: 1px solid rgba(0, 255, 120, 0.35);
+}
+.success:hover { background: rgba(0, 255, 120, 0.18); }
+
+.danger {
+  color: #fff;
+  background: #ef4444;
+}
+.danger:hover { filter: brightness(1.05); }
+
+/* ================= Tables ================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 14px;
+}
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+thead th { font-weight: 700; opacity: 0.85; }
+tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+
+/* ================= Typography ================= */
+h1, h2, h3 { margin: 0 0 8px; }
+.muted { opacity: 0.75; }
+
+/* ================= Landing Page ================= */
+.landing-topbar {
+  position: sticky; top: 0; z-index: 10;
+  height: 60px; display: flex; align-items: center;
+  padding: 0 16px;
+
+  /* 🌌 pastel galaxy gradient */
+  background: linear-gradient(
+    135deg,
+    rgba(245, 176, 207, 0.35),  /* soft pink */
+    rgba(185, 167, 225, 0.35),  /* lavender */
+    rgba(176, 244, 239, 0.35),  /* aqua */
+    rgba(255, 226, 138, 0.25)   /* star yellow */
+  );
+
+  border-bottom: 2px solid var(--lavender);
+  backdrop-filter: blur(8px);
+}
+.landing-brand { font-size: 18px; font-weight: 800; letter-spacing: .3px; }
+
+.landing-wrap {
+  min-height: calc(100vh - 60px);
+  display: grid; place-items: center;
+  padding: 24px 16px;
+}
+
+.landing-title { font-size: 24px; font-weight: 800; margin: 4px 0 6px; }
+.landing-sub   { opacity: .85; margin-bottom: 16px; }
+
+/* Landing grid + tiles */
+.landing-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.landing-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: #fff;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  padding: 12px;
+  transition: transform .12s ease, filter .12s ease, background .12s ease, border-color .12s ease;
+}
+.landing-tile:hover {
+  transform: translateY(-1px);
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(168,85,247,0.45);
+  box-shadow: inset 0 0 18px rgba(168,85,247,0.25);
+}
+
+.landing-img {
+  display: block;
+  width: 180px;
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+}
+
+.landing-label {
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.95;
+}
+
+/* ================= Hamburger Layout ================= */
+.layout { min-height: 100dvh; color: #fff; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 12px;
+  height: 56px; padding: 0 12px;
+  background: linear-gradient(
+  135deg,
+  rgba(168, 85, 247, 0.35),   /* plasma purple */
+  rgba(34, 211, 238, 0.35),   /* aqua */
+  rgba(255, 224, 138, 0.25)   /* star yellow */
+);
+  border-bottom: 2px solid var(--lavender);
+  backdrop-filter: blur(8px);
+}
+.brand { font-size: 16px; font-weight: 800; letter-spacing: .3px; }
+.spacer { width: 32px; }
+
+/* ========== Hamburger (gradient bars + hover sheen) ========== */
+/* ====== Galaxy Hamburger Button ====== */
+.hamburger {
+  width: 48px; 
+  height: 48px;
+  padding: 10px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.4);     /* subtle outline */
+  box-shadow: 0 0 8px rgba(185, 167, 225, 0.4);   /* lavender glow */
+  background: transparent;
+  transition: background 0.25s ease, box-shadow 0.25s ease, transform 0.15s ease;
+}
+
+.hamburger:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(245,176,207,0.25),  /* pink */
+    rgba(185,167,225,0.25),  /* lavender */
+    rgba(176,244,239,0.25)   /* aqua */
+  );
+  box-shadow: 0 0 12px rgba(185,167,225,0.65);
+}
+
+/* Hamburger bars */
+.hamburger span {
+  display: block;
+  width: 28px;       /* longer bars */
+  height: 3px;       /* thicker for clarity */
+  border-radius: 2px;
+  background: linear-gradient(90deg, #f5b0cf, #b9a7e1, #7ec3f6, #ffe28a);
+  box-shadow: 0 0 4px rgba(168,85,247,0.35);
+  transition: transform .2s, opacity .2s;
+}
+
+/* Open state animation (X) */
+.hamburger.is-open span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+.hamburger.is-open span:nth-child(2) {
+  opacity: 0;
+}
+.hamburger.is-open span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* ========== Screen dimmer behind drawer (soft radial + blur) ========== */
+.backdrop {
+  position: fixed; inset: 0; z-index: 39;
+  background:
+    radial-gradient(60% 50% at 20% 15%, rgba(168,85,247,.18), transparent 60%),
+    radial-gradient(50% 45% at 80% 20%, rgba(126,195,246,.14), transparent 65%),
+    rgba(0,0,20,.55);
+  backdrop-filter: blur(3px);
+}
+
+/* ========== Drawer (glass + gradient) ========== */
+.drawer {
+  position: fixed; inset: 0 auto 0 0; z-index: 40;
+  width: 78%; max-width: 320px; transform: translateX(-100%);
+  background: linear-gradient(160deg,
+    rgba(185,167,225,.28),  /* lavender */
+    rgba(245,176,207,.26),  /* pink */
+    rgba(176,244,239,.22)   /* aqua */
+  );
+  border-right: 1px solid var(--glass-stroke);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 24px var(--glass-shadow);
+  transition: transform .2s ease;
+  display: flex; flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+
+/* Header strip with subtle highlight */
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px;
+  background: linear-gradient(180deg,
+    rgba(255,255,255,.10),
+    rgba(255,255,255,.04) 35%,
+    transparent
+  );
+  border-bottom: 1px solid var(--glass-stroke);
+}
+.drawer-title { font-weight: 700; letter-spacing: .3px; }
+.drawer .close {
+  border: 0; background: transparent; color: #fff;
+  font-size: 24px; line-height: 1; cursor: pointer; border-radius: 8px; padding: 4px 6px;
+}
+.drawer .close:hover {
+  background: linear-gradient(135deg,
+    rgba(245,176,207,.18),
+    rgba(185,167,225,.18),
+    rgba(176,244,239,.16)
+  );
+}
+
+/* ========== Menu list & links (glass chips with gradient states) ========== */
+.menu {
+  list-style: none; margin: 8px 0; padding: 8px; display: grid; gap: 6px;
+}
+.menu-link {
+  display: block; padding: 12px; border-radius: 12px;
+  text-decoration: none; color: #fff;
+  background: linear-gradient(135deg,
+    rgba(255,255,255,.07),
+    rgba(255,255,255,.05)
+  );
+  border: 1px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.menu-link:hover {
+  background: linear-gradient(135deg,
+    rgba(245,176,207,.18),
+    rgba(185,167,225,.16),
+    rgba(176,244,239,.14)
+  );
+  border-color: var(--glass-stroke);
+  box-shadow:
+    inset 0 0 18px rgba(168,85,247,.22),
+    0 4px 18px rgba(0,0,0,.25);
+  transform: translateY(-1px);
+}
+.menu-link.is-active {
+  background: linear-gradient(135deg,
+    rgba(245,176,207,.20),
+    rgba(185,167,225,.20),
+    rgba(176,244,239,.18),
+    rgba(255,226,138,.16)
+  );
+  border-color: rgba(168,85,247,.55);
+  box-shadow:
+    inset 0 0 18px rgba(168,85,247,.35),
+    0 0 24px var(--glass-shadow);
+}
+
+
+/* Keep page content centered */
+.content { padding: 12px 0 24px; }
+@media (min-width: 768px) { .content { padding: 16px 0 32px; } }
+
+/* Small-screen polish */
+@media (max-width: 640px) {
+  .drawer { width: 85%; }
+}
+/* chips for the range selector */
+.chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(135deg,
+    rgba(245,176,207,.18),
+    rgba(185,167,225,.16),
+    rgba(176,244,239,.14)
+  );
+  color: #fff;
+  font-size: 13px;
+  transition: filter .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.chip:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.chip.is-active {
+  border-color: rgba(168,85,247,.55);
+  box-shadow: inset 0 0 18px rgba(168,85,247,.28), 0 0 20px rgba(0,0,0,.25);
+}
+
+/* KPI cards that sit inside the page */
+.kpi-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+@media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } }
+
+.kpi {
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.04));
+  border: 1px solid rgba(255,255,255,.12);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03);
+}
+.kpi-label { font-size: 12px; opacity: .7; }
+.kpi-value { font-size: 20px; font-weight: 700; }
+
+/* Two-column card rows */
+.grid-2 { display: grid; gap: 16px; }
+@media (min-width: 768px) { .grid-2 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+/* simple utilities */
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.row-between { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+.list-divided { list-style: none; margin: 0; padding: 0; }
+.list-divided > li { padding: 8px 0; border-top: 1px solid rgba(255,255,255,.08); }
+.list-divided > li:first-child { border-top: 0; }
+
+/* hourly bars that match your palette */
+.hourbars { display: flex; align-items: flex-end; gap: 6px; height: 110px; }
+.hourbar {
+  width: 8px; border-radius: 6px;
+  background: linear-gradient(180deg, #ffe28a, #b9a7e1, #7ec3f6); /* yellow->lavender->blue */
+  box-shadow: 0 0 6px rgba(185,167,225,.45);
+}
+.hourlabels { display: flex; justify-content: space-between; font-size: 11px; opacity: .7; margin-top: 6px; }
+.menu-link {
+  display: inline-flex;           /* <— was block */
+  align-items: center;
+  gap: 10px;                      /* space between icon and label */
+  /* ...keep the rest of your styles... */
+}
+/* index.css */
+.icon-20 { width: 20px; height: 20px; display: inline-block; }
+/* Keep icons aligned and sized */
+.menu-link svg { width: 20px; height: 20px; flex: 0 0 auto; }
+
+/* Optional gentle glow on hover of the whole link */
+.menu-link:hover svg { filter: drop-shadow(0 0 6px rgba(168,85,247,.55)); }
+/* ===== Themed Scrollbars (Galaxy Pastel) ===== */
+:root {
+  --scrollbar-track: rgba(255,255,255,.08);
+  --scrollbar-thumb: linear-gradient(180deg, #f5b0cf, #b9a7e1, #7ec3f6);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #ffd6e8, #d5c7ff, #bde2ff);
+}
+
+/* WebKit (Chrome/Edge/Safari) */
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: var(--scrollbar-thumb);
+  border: 2px solid rgba(0,0,0,.15); /* inset edge for glassy feel */
+  box-shadow: 0 0 8px rgba(168,85,247,.25) inset;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b9a7e1 rgba(255,255,255,.08);
+}
+
+/* If your drawer or any specific panel needs its own overflow: */
+.drawer {
+  overflow-y: auto;
+}
