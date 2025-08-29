@@ -6,7 +6,8 @@ import useCatalog from "../state/useCatalog";
 const SHEETS_ENDPOINT = import.meta.env.VITE_SHEETS_ENDPOINT;
 const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
 
-export default function RingUp() {
+  export default function RingUp() {
+
   // ----- Persisted rows for the "current order"
   const [rows, setRows] = useState(() => {
     try {
