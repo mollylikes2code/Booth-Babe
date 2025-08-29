@@ -1,83 +1,114 @@
 // src/pages/RingUp.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { PRODUCT_TYPES, PATTERNS as FALLBACK_PATTERNS } from "../data";
 import useSales from "../state/useSales";
-import useCatalog from "../state/useCatalog";
 
 const SHEETS_ENDPOINT = import.meta.env.VITE_SHEETS_ENDPOINT;
 const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
 
-  export default function RingUp() {
+const LS_SERIES = "bb_fabricSeries";
 
+function readSeriesCatalog() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LS_SERIES) || "[]");
+    // Expect [{id, name, fabrics:[{id,name}]}...]
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+export default function RingUp() {
   // ----- Persisted rows for the "current order"
   const [rows, setRows] = useState(() => {
     try {
       const saved = localStorage.getItem("bb_rows");
       return saved ? JSON.parse(saved) : [];
-    } catch (err) {
-      console.warn("bb_rows parse failed; starting empty.", err);
+    } catch {
       return [];
     }
   });
   useEffect(() => {
-    try {
-      localStorage.setItem("bb_rows", JSON.stringify(rows));
-    } catch (err) {
-      console.error("Failed to write bb_rows:", err);
-    }
+    try { localStorage.setItem("bb_rows", JSON.stringify(rows)); } catch {/*ignore*/}
   }, [rows]);
 
-  // ----- Shared sales + event state
-  const { sales, appendSale, eventName, startEvent, endEvent } = useSales();
+  // ----- Live catalog from Catalog.jsx (updates instantly on changes)
+  const [catalog, setCatalog] = useState(readSeriesCatalog());
+  useEffect(() => {
+    function reload() { setCatalog(readSeriesCatalog()); }
+    window.addEventListener("storage", (e) => { if (e.key === LS_SERIES) reload(); });
+    window.addEventListener("bb:fabrics-updated", reload);
+    return () => {
+      window.removeEventListener("storage", reload);
+      window.removeEventListener("bb:fabrics-updated", reload);
+    };
+  }, []);
 
-  // ----- Live catalog (item types + fabrics)
-  const { itemTypes, fabricOptions } = useCatalog();
+  // Flatten for a default selected option
+  const firstOptionValue = useMemo(() => {
+    if (catalog.length && catalog[0].fabrics?.length) {
+      return `${catalog[0].id}::${catalog[0].fabrics[0].id}`;
+    }
+    // fallback to old static list if no catalog yet
+    return `__fallback__::${FALLBACK_PATTERNS[0]}`;
+  }, [catalog]);
 
-  // safe defaults
-  const firstType = itemTypes?.[0]?.type || "";
-  const firstFabricId = fabricOptions?.[0]?.id || "";
+  // ----- Sales state (shared via hook so Snapshot updates instantly)
+  const { sales, appendSale } = useSales();
 
   // ----- Form state
-  const [productType, setProductType] = useState(firstType);
-  const [fabricId, setFabricId]       = useState(firstFabricId);
+  const [productType, setProductType] = useState(PRODUCT_TYPES[0].type);
+  const [fabricSel, setFabricSel]     = useState(firstOptionValue);
   const [priceOverride, setPriceOverride] = useState("");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
 
-  // keep defaults in sync if catalog changes
+  // Keep fabric default in sync if catalog changes (first available)
   useEffect(() => {
-    if (!productType && firstType) setProductType(firstType);
-  }, [firstType, productType]);
-
-  useEffect(() => {
-    if (!fabricId && firstFabricId) setFabricId(firstFabricId);
-  }, [firstFabricId, fabricId]);
+    setFabricSel((prev) => prev ?? firstOptionValue);
+  }, [firstOptionValue]);
 
   const defaultPrice = useMemo(() => {
-    const found = (itemTypes || []).find((p) => p.type === productType);
-    return Number(found?.defaultPrice ?? 0);
-  }, [productType, itemTypes]);
+    const found = PRODUCT_TYPES.find((p) => p.type === productType);
+    return found?.defaultPrice ?? 0;
+  }, [productType]);
 
-  const priceToUse = priceOverride === "" ? defaultPrice : Number(priceOverride || 0);
+  const priceToUse = priceOverride === "" ? defaultPrice : Number(priceOverride);
+
+  /** Decode fabric selection into {seriesName, fabricName} */
+  function decodeFabric(val) {
+    if (!val) return { seriesName: "Miscellaneous", fabricName: "" };
+    const [sid, fid] = String(val).split("::");
+    if (sid === "__fallback__") {
+      return { seriesName: "Miscellaneous", fabricName: fid || "" };
+    }
+    const s = catalog.find((x) => x.id === sid);
+    const f = s?.fabrics?.find((x) => x.id === fid);
+    return {
+      seriesName: s?.name || "Miscellaneous",
+      fabricName: f?.name || "",
+    };
+  }
 
   // ----- Helpers
   function addRow(e) {
     e.preventDefault();
-    const fab = (fabricOptions || []).find(f => f.id === fabricId);
-    if (!productType || !fab) return;
+    const { seriesName, fabricName } = decodeFabric(fabricSel);
+    if (!productType || !fabricName) return;
 
     setRows((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
         productType,
-        series: fab.series,   // store both for Snapshot
-        pattern: fab.pattern,
+        series: seriesName,
+        pattern: fabricName,
         price: Number(priceToUse) || 0,
         qty: Number(qty) || 0,
         notes: notes.trim(),
       },
     ]);
-    setFabricId(firstFabricId || "");
+    // reset only qty/notes/price override; keep last fabric selected for speed
     setPriceOverride("");
     setQty(1);
     setNotes("");
@@ -87,17 +118,16 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
     setRows((prev) => prev.filter((r) => r.id !== id));
   }
 
-  const subtotal = rows.reduce(
-    (sum, r) => sum + (Number(r.price) || 0) * (Number(r.qty) || 0),
-    0
-  );
+  const subtotal = rows.reduce((sum, r) => sum + (Number(r.price) || 0) * (Number(r.qty) || 0), 0);
 
+  // ----- Clear the current order
   function clearTable() {
     if (rows.length === 0) return;
     const ok = window.confirm("Clear the current order? This cannot be undone.");
     if (ok) setRows([]);
   }
 
+  // ----- Generate order number
   function genOrderNumber(nextIndex) {
     const d = new Date();
     const ymd =
@@ -107,12 +137,15 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
     return `BB-${ymd}-${String(nextIndex).padStart(3, "0")}`;
   }
 
-  async function recordSale() {
+  // ===== Record sale flow: Preview → Confirm/Edit =====
+  const [showPreview, setShowPreview] = useState(false);
+  const [pendingSale, setPendingSale] = useState(null);
+
+  function openPreview() {
     if (rows.length === 0) {
       alert("No items in the order to record.");
       return;
     }
-
     const nextIndex = sales.length + 1;
     const sale = {
       id: crypto.randomUUID(),
@@ -120,12 +153,12 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
       timestamp: Date.now(),
       timestampIso: new Date().toISOString(),
       items: rows.map((r) => ({
-        sku: r.id,
+        sku: r.id,                    // placeholder; you can sub real SKU later
         name: r.productType,
         qty: Number(r.qty) || 0,
         price: Number(r.price) || 0,
-        series: r.series,
         pattern: r.pattern,
+        series: r.series,            // <-- keep series for Snapshot "Top Series"
       })),
       subtotal: Number(subtotal) || 0,
       tax: 0,
@@ -133,126 +166,99 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
       paymentMethod: "other",
       notes: "",
     };
+    setPendingSale(sale);
+    setShowPreview(true);
+  }
 
-    appendSale(sale);
+  async function confirmSale() {
+    if (!pendingSale) return;
+
+    // 1) Save to shared sales (updates Snapshot immediately)
+    appendSale(pendingSale);
+
+    // 2) Clear UI rows
     setRows([]);
+    setShowPreview(false);
 
+    // 3) Send to Google Sheets
     try {
       const res = await fetch(SHEETS_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           secret: SHEETS_SECRET,
-          timestamp: sale.timestampIso,
-          orderNumber: sale.orderNumber,
-          subtotal: sale.subtotal,
-          eventName,                 // include active event ("" if none)
-          items: sale.items,
-          notes: sale.notes,
+          timestamp: pendingSale.timestampIso,
+          orderNumber: pendingSale.orderNumber,
+          subtotal: pendingSale.subtotal,
+          items: pendingSale.items,
+          notes: pendingSale.notes,
         }),
       });
-
       let ok = true;
-      let respText = "";
-      try {
-        respText = await res.text();      // read as text first
-        try {
-          const data = JSON.parse(respText);
-          ok = data?.ok === true;
-        } catch {
-          ok = res.ok;                   // non-JSON – fall back to HTTP status
-        }
-      } catch (err) {
-        ok = false;
-        respText = String(err);
-      }
-
+      try { ok = (await res.json())?.ok === true; } catch {/*ignore*/}
       alert(
         ok
-          ? `Sale recorded & sync sent: ${sale.orderNumber}`
-          : `Sale recorded locally. Sync might have failed.\n\nServer reply:\n${respText}`
+          ? `Sale recorded & sync sent: ${pendingSale.orderNumber}`
+          : `Sale recorded locally. Sync might have failed.`
       );
     } catch (err) {
       console.error("Sync failed:", err);
       alert(`Sale recorded locally. Sync failed (network error).`);
     }
 
-    // mirror to localStorage for Snapshot/other tabs
+    // 4) Also mirror into LS for any legacy readers (optional)
     try {
       const ls = JSON.parse(localStorage.getItem("bb_sales") || "[]");
-      const updated = ls.concat(sale);
-      localStorage.setItem("bb_sales", JSON.stringify(updated));
-      window.dispatchEvent(new CustomEvent("bb:sales-updated", { detail: { sales: updated } }));
-    } catch (err) {
-      console.warn("Failed to mirror sale to localStorage event.", err);
-    }
-  } // << properly closes recordSale()
+      localStorage.setItem("bb_sales", JSON.stringify(ls.concat(pendingSale)));
+      window.dispatchEvent(new CustomEvent("bb:sales-updated", { detail: { sales: ls.concat(pendingSale) } }));
+    } catch {/*ignore*/}
+  }
+
+  function editSale() {
+    // Just close preview to edit current rows
+    setShowPreview(false);
+    setPendingSale(null);
+  }
 
   return (
     <div className="min-h-screen text-white">
       <div className="wrap">
-        {/* ===== Toolbar / Header ===== */}
-        <header className="toolbar">
-          <div className="toolbar-left">
-            <h2>Ring Up</h2>
-          </div>
-
-          <div className="toolbar-actions">
-            {eventName ? (
-              <button
-                className="secondary"
-                onClick={() => {
-                  if (confirm(`End event "${eventName}" now?`)) endEvent();
-                }}
-                title="End the active event"
-              >
-                End Event ({eventName})
-              </button>
-            ) : (
-              <button
-                className="primary"
-                onClick={() => {
-                  const suggestion = new Date().toLocaleDateString(undefined, {
-                    year: "numeric",
-                    month: "short",
-                    day: "2-digit",
-                  });
-                  const name = prompt("Enter event name:", suggestion);
-                  if (name && name.trim()) startEvent(name.trim());
-                }}
-                title="Start a new event"
-              >
-                Start New Event
-              </button>
-            )}
-          </div>
-        </header>
-
-        <h1>Booth Babe – Inventory</h1>
+        <h1>Booth Babe – Ring Up</h1>
 
         <form className="card" onSubmit={addRow}>
           <div className="row">
-            <label>Item Type</label>
+            <label>Product Type</label>
             <select value={productType} onChange={(e) => setProductType(e.target.value)}>
-              {(itemTypes || []).length ? (
-                itemTypes.map((p) => (
-                  <option key={p.type} value={p.type}>{p.type}</option>
-                ))
-              ) : (
-                <option value="">No item types yet — add some in Catalog</option>
-              )}
+              {PRODUCT_TYPES.map((p) => (
+                <option key={p.type} value={p.type}>
+                  {p.type}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="row">
             <label>Fabric</label>
-            <select value={fabricId} onChange={(e) => setFabricId(e.target.value)}>
-              {(fabricOptions || []).length ? (
-                fabricOptions.map((f) => (
-                  <option key={f.id} value={f.id}>{f.label}</option> // "Series — Pattern"
+            <select
+              value={fabricSel}
+              onChange={(e) => setFabricSel(e.target.value)}
+            >
+              {catalog.length ? (
+                catalog.map((s) => (
+                  <optgroup key={s.id} label={s.name}>
+                    {(s.fabrics || []).map((f) => (
+                      <option key={f.id} value={`${s.id}::${f.id}`}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))
               ) : (
-                <option value="">No fabrics yet — add some in Catalog</option>
+                <optgroup label="Miscellaneous">
+                  {FALLBACK_PATTERNS.map((p) => (
+                    <option key={p} value={`__fallback__::${p}`}>{p}</option>
+                  ))}
+                </optgroup>
               )}
             </select>
           </div>
@@ -289,7 +295,7 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
             <h2>Current Order</h2>
             <div className="toolbar-actions">
               <button className="secondary" onClick={clearTable}>Clear Table</button>
-              <button className="success" onClick={recordSale}>Record Sale</button>
+              <button className="success" onClick={openPreview}>Record Sale</button>
             </div>
           </div>
 
@@ -300,6 +306,7 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
               <thead>
                 <tr>
                   <th>Type</th>
+                  <th>Series</th>
                   <th>Fabric</th>
                   <th>Price</th>
                   <th>Qty</th>
@@ -311,20 +318,27 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>{r.productType}</td>
-                    <td>{r.series} — {r.pattern}</td>
+                    <td>{r.series}</td>
+                    <td>{r.pattern}</td>
                     <td>${Number(r.price).toFixed(2)}</td>
                     <td>{r.qty}</td>
                     <td>${(Number(r.price) * Number(r.qty)).toFixed(2)}</td>
                     <td>
-                      <button className="danger" onClick={() => removeRow(r.id)}>Delete</button>
+                      <button className="danger" onClick={() => removeRow(r.id)}>
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" style={{ textAlign: "right", fontWeight: 700 }}>Subtotal</td>
-                  <td colSpan="2" style={{ fontWeight: 700 }}>${subtotal.toFixed(2)}</td>
+                  <td colSpan="5" style={{ textAlign: "right", fontWeight: 700 }}>
+                    Subtotal
+                  </td>
+                  <td colSpan="2" style={{ fontWeight: 700 }}>
+                    ${subtotal.toFixed(2)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -335,6 +349,59 @@ const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
           </p>
         </div>
       </div>
+
+      {/* Preview modal */}
+      {showPreview && pendingSale && (
+        <div className="modal-backdrop" onMouseDown={(e) => {
+          if (e.target.classList.contains("modal-backdrop")) setShowPreview(false);
+        }}>
+          <div className="modal-card" role="dialog" aria-modal="true" style={{ maxWidth: 720 }}>
+            <div className="modal-title">Sales Order Preview</div>
+
+            <div className="rounded-2xl p-4 bg-white/5 border border-white/10">
+              <div className="text-sm mb-2 opacity-80">
+                <div><strong>Order #:</strong> {pendingSale.orderNumber}</div>
+                <div><strong>Date:</strong> {new Date(pendingSale.timestamp).toLocaleString()}</div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Series</th>
+                    <th>Fabric</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingSale.items.map((i) => (
+                    <tr key={i.sku}>
+                      <td>{i.name}</td>
+                      <td>{i.series || "—"}</td>
+                      <td>{i.pattern}</td>
+                      <td>{i.qty}</td>
+                      <td>${Number(i.price).toFixed(2)}</td>
+                      <td>${(Number(i.price) * Number(i.qty)).toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: "right", fontWeight: 700 }}>Total</td>
+                    <td style={{ fontWeight: 700 }}>${Number(pendingSale.total).toFixed(2)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="modal-actions">
+              <button className="secondary" onClick={editSale}>Edit</button>
+              <button className="primary" onClick={confirmSale}>Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
