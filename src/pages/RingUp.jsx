@@ -1,7 +1,7 @@
 // src/pages/RingUp.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import useCatalog from "../state/useCatalog";
 import useSales from "../state/useSales";
+import useCatalog from "../state/useCatalog";
 
 const SHEETS_ENDPOINT = import.meta.env.VITE_SHEETS_ENDPOINT;
 const SHEETS_SECRET   = import.meta.env.VITE_SHEETS_SECRET;
@@ -12,7 +12,8 @@ export default function RingUp() {
     try {
       const saved = localStorage.getItem("bb_rows");
       return saved ? JSON.parse(saved) : [];
-    } catch {
+    } catch (err) {
+      console.warn("bb_rows parse failed; starting empty.", err);
       return [];
     }
   });
@@ -24,59 +25,58 @@ export default function RingUp() {
     }
   }, [rows]);
 
-  // ----- Catalog + Sales state
-  const { types, patterns } = useCatalog();
-  const {
-    sales,
-    appendSale,
-    eventName,
-    startEvent,
-    endEvent,
-  } = useSales();
+  // ----- Shared sales + event state
+  const { sales, appendSale, eventName, startEvent, endEvent } = useSales();
 
-  // ----- Form state (init from current catalog)
-  const [productType, setProductType] = useState(() => types[0]?.type ?? "");
-  const [pattern, setPattern]         = useState(() => patterns[0] ?? "");
+  // ----- Live catalog (item types + fabrics)
+  const { itemTypes, fabricOptions } = useCatalog();
+
+  // safe defaults
+  const firstType = itemTypes?.[0]?.type || "";
+  const firstFabricId = fabricOptions?.[0]?.id || "";
+
+  // ----- Form state
+  const [productType, setProductType] = useState(firstType);
+  const [fabricId, setFabricId]       = useState(firstFabricId);
   const [priceOverride, setPriceOverride] = useState("");
   const [qty, setQty] = useState(1);
   const [notes, setNotes] = useState("");
 
-  // Keep selections valid if catalog changes
+  // keep defaults in sync if catalog changes
   useEffect(() => {
-    if (!types.find((t) => t.type === productType)) {
-      setProductType(types[0]?.type ?? "");
-    }
-  }, [types, productType]);
-  useEffect(() => {
-    if (!patterns.includes(pattern)) {
-      setPattern(patterns[0] ?? "");
-    }
-  }, [patterns, pattern]);
+    if (!productType && firstType) setProductType(firstType);
+  }, [firstType, productType]);
 
-  // Default price comes from selected type
+  useEffect(() => {
+    if (!fabricId && firstFabricId) setFabricId(firstFabricId);
+  }, [firstFabricId, fabricId]);
+
   const defaultPrice = useMemo(() => {
-    const found = types.find((p) => p.type === productType);
-    return found?.defaultPrice ?? 0;
-  }, [types, productType]);
+    const found = (itemTypes || []).find((p) => p.type === productType);
+    return Number(found?.defaultPrice ?? 0);
+  }, [productType, itemTypes]);
 
-  const priceToUse = priceOverride === "" ? defaultPrice : Number(priceOverride) || 0;
+  const priceToUse = priceOverride === "" ? defaultPrice : Number(priceOverride || 0);
 
   // ----- Helpers
   function addRow(e) {
     e.preventDefault();
-    if (!productType || !pattern) return;
+    const fab = (fabricOptions || []).find(f => f.id === fabricId);
+    if (!productType || !fab) return;
+
     setRows((prev) => [
       ...prev,
       {
         id: crypto.randomUUID(),
         productType,
-        pattern,
+        series: fab.series,   // store both for Snapshot
+        pattern: fab.pattern,
         price: Number(priceToUse) || 0,
         qty: Number(qty) || 0,
         notes: notes.trim(),
       },
     ]);
-    setPattern(patterns[0] ?? "");
+    setFabricId(firstFabricId || "");
     setPriceOverride("");
     setQty(1);
     setNotes("");
@@ -91,14 +91,12 @@ export default function RingUp() {
     0
   );
 
-  // ----- Clear the current order
   function clearTable() {
     if (rows.length === 0) return;
     const ok = window.confirm("Clear the current order? This cannot be undone.");
     if (ok) setRows([]);
   }
 
-  // ----- Generate order number
   function genOrderNumber(nextIndex) {
     const d = new Date();
     const ymd =
@@ -108,7 +106,6 @@ export default function RingUp() {
     return `BB-${ymd}-${String(nextIndex).padStart(3, "0")}`;
   }
 
-  // ----- Record sale (local shared state + send to Sheets)
   async function recordSale() {
     if (rows.length === 0) {
       alert("No items in the order to record.");
@@ -122,10 +119,11 @@ export default function RingUp() {
       timestamp: Date.now(),
       timestampIso: new Date().toISOString(),
       items: rows.map((r) => ({
-        sku: r.id, // placeholder SKU
+        sku: r.id,
         name: r.productType,
         qty: Number(r.qty) || 0,
         price: Number(r.price) || 0,
+        series: r.series,
         pattern: r.pattern,
       })),
       subtotal: Number(subtotal) || 0,
@@ -133,124 +131,127 @@ export default function RingUp() {
       total: Number(subtotal) || 0,
       paymentMethod: "other",
       notes: "",
-      // Tag with active event (the hook also tags, this is to include in outbound payload too)
-      event: eventName || null,
     };
 
-    // 1) Save to shared sales (updates Snapshot instantly)
     appendSale(sale);
-
-    // 2) Clear current order UI
     setRows([]);
 
-    // 3) Send to Google Sheets (optional)
     try {
       const res = await fetch(SHEETS_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           secret: SHEETS_SECRET,
           timestamp: sale.timestampIso,
           orderNumber: sale.orderNumber,
           subtotal: sale.subtotal,
+          eventName,                 // include active event ("" if none)
           items: sale.items,
           notes: sale.notes,
-          event: sale.event,
         }),
       });
 
       let ok = true;
+      let respText = "";
       try {
-        const data = await res.json();
-        ok = data?.ok === true;
-      } catch {
-        // some GAS deployments don't return JSON
+        respText = await res.text();      // read as text first
+        try {
+          const data = JSON.parse(respText);
+          ok = data?.ok === true;
+        } catch {
+          ok = res.ok;                   // non-JSON – fall back to HTTP status
+        }
+      } catch (err) {
+        ok = false;
+        respText = String(err);
       }
 
       alert(
         ok
           ? `Sale recorded & sync sent: ${sale.orderNumber}`
-          : `Sale recorded locally. Sync might have failed.`
+          : `Sale recorded locally. Sync might have failed.\n\nServer reply:\n${respText}`
       );
     } catch (err) {
       console.error("Sync failed:", err);
       alert(`Sale recorded locally. Sync failed (network error).`);
     }
-  }
 
-  const noTypes = types.length === 0;
-  const noPatterns = patterns.length === 0;
+    // mirror to localStorage for Snapshot/other tabs
+    try {
+      const ls = JSON.parse(localStorage.getItem("bb_sales") || "[]");
+      const updated = ls.concat(sale);
+      localStorage.setItem("bb_sales", JSON.stringify(updated));
+      window.dispatchEvent(new CustomEvent("bb:sales-updated", { detail: { sales: updated } }));
+    } catch (err) {
+      console.warn("Failed to mirror sale to localStorage event.", err);
+    }
+  } // << properly closes recordSale()
 
   return (
     <div className="min-h-screen text-white">
       <div className="wrap">
-        <h1>Booth Babe – Inventory</h1>
-
-        {/* Optional: Event controls card */}
-        <section className="card" style={{ marginTop: 16 }}>
-          <div className="toolbar">
-            <h2>Event</h2>
-            <div className="toolbar-actions">
-              {eventName ? (
-                <>
-                  <span className="chip is-active">Active: {eventName}</span>
-                  <button className="secondary" onClick={endEvent}>
-                    End Event
-                  </button>
-                </>
-              ) : (
-                <button
-                  className="primary"
-                  onClick={() => {
-                    const name = prompt("Enter event name:");
-                    if (name) startEvent(name);
-                  }}
-                >
-                  Start Event
-                </button>
-              )}
-            </div>
+        {/* ===== Toolbar / Header ===== */}
+        <header className="toolbar">
+          <div className="toolbar-left">
+            <h2>Ring Up</h2>
           </div>
-          <p className="muted">
-            Start an event to tag all new sales. You can end it anytime.
-          </p>
-        </section>
+
+          <div className="toolbar-actions">
+            {eventName ? (
+              <button
+                className="secondary"
+                onClick={() => {
+                  if (confirm(`End event "${eventName}" now?`)) endEvent();
+                }}
+                title="End the active event"
+              >
+                End Event ({eventName})
+              </button>
+            ) : (
+              <button
+                className="primary"
+                onClick={() => {
+                  const suggestion = new Date().toLocaleDateString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                  });
+                  const name = prompt("Enter event name:", suggestion);
+                  if (name && name.trim()) startEvent(name.trim());
+                }}
+                title="Start a new event"
+              >
+                Start New Event
+              </button>
+            )}
+          </div>
+        </header>
+
+        <h1>Booth Babe – Inventory</h1>
 
         <form className="card" onSubmit={addRow}>
           <div className="row">
-            <label>Product Type</label>
-            <select
-              value={productType}
-              onChange={(e) => setProductType(e.target.value)}
-              disabled={noTypes}
-            >
-              {noTypes ? (
-                <option value="">Add a type in Catalog</option>
-              ) : (
-                types.map((p) => (
-                  <option key={p.type} value={p.type}>
-                    {p.type}
-                  </option>
+            <label>Item Type</label>
+            <select value={productType} onChange={(e) => setProductType(e.target.value)}>
+              {(itemTypes || []).length ? (
+                itemTypes.map((p) => (
+                  <option key={p.type} value={p.type}>{p.type}</option>
                 ))
+              ) : (
+                <option value="">No item types yet — add some in Catalog</option>
               )}
             </select>
           </div>
 
           <div className="row">
-            <label>Pattern</label>
-            <select
-              value={pattern}
-              onChange={(e) => setPattern(e.target.value)}
-              disabled={noPatterns}
-            >
-              {noPatterns ? (
-                <option value="">Add a pattern in Catalog</option>
-              ) : (
-                patterns.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
+            <label>Fabric</label>
+            <select value={fabricId} onChange={(e) => setFabricId(e.target.value)}>
+              {(fabricOptions || []).length ? (
+                fabricOptions.map((f) => (
+                  <option key={f.id} value={f.id}>{f.label}</option> // "Series — Pattern"
                 ))
+              ) : (
+                <option value="">No fabrics yet — add some in Catalog</option>
               )}
             </select>
           </div>
@@ -261,7 +262,7 @@ export default function RingUp() {
               <input
                 type="number"
                 step="0.01"
-                placeholder={`Default $${(defaultPrice || 0).toFixed(2)}`}
+                placeholder={`Default $${defaultPrice}`}
                 value={priceOverride}
                 onChange={(e) => setPriceOverride(e.target.value)}
               />
@@ -271,38 +272,23 @@ export default function RingUp() {
 
           <div className="row">
             <label>Quantity</label>
-            <input
-              type="number"
-              min="0"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-            />
+            <input type="number" min="0" value={qty} onChange={(e) => setQty(e.target.value)} />
           </div>
 
           <div className="row">
             <label>Notes</label>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="fabric, variant, etc."
-            />
+            <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="fabric, variant, etc." />
           </div>
 
-          <button className="primary" disabled={noTypes || noPatterns}>
-            Add to List
-          </button>
+          <button className="primary">Add to List</button>
         </form>
 
         <div className="card">
           <div className="toolbar">
             <h2>Current Order</h2>
             <div className="toolbar-actions">
-              <button className="secondary" onClick={clearTable}>
-                Clear Table
-              </button>
-              <button className="success" onClick={recordSale}>
-                Record Sale
-              </button>
+              <button className="secondary" onClick={clearTable}>Clear Table</button>
+              <button className="success" onClick={recordSale}>Record Sale</button>
             </div>
           </div>
 
@@ -313,7 +299,7 @@ export default function RingUp() {
               <thead>
                 <tr>
                   <th>Type</th>
-                  <th>Pattern</th>
+                  <th>Fabric</th>
                   <th>Price</th>
                   <th>Qty</th>
                   <th>Total</th>
@@ -324,26 +310,20 @@ export default function RingUp() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td>{r.productType}</td>
-                    <td>{r.pattern}</td>
+                    <td>{r.series} — {r.pattern}</td>
                     <td>${Number(r.price).toFixed(2)}</td>
                     <td>{r.qty}</td>
                     <td>${(Number(r.price) * Number(r.qty)).toFixed(2)}</td>
                     <td>
-                      <button className="danger" onClick={() => removeRow(r.id)}>
-                        Delete
-                      </button>
+                      <button className="danger" onClick={() => removeRow(r.id)}>Delete</button>
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan="4" style={{ textAlign: "right", fontWeight: 700 }}>
-                    Subtotal
-                  </td>
-                  <td colSpan="2" style={{ fontWeight: 700 }}>
-                    ${subtotal.toFixed(2)}
-                  </td>
+                  <td colSpan="4" style={{ textAlign: "right", fontWeight: 700 }}>Subtotal</td>
+                  <td colSpan="2" style={{ fontWeight: 700 }}>${subtotal.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>

@@ -1,11 +1,11 @@
 // src/pages/SalesLayout.jsx
-import { PlanetIcon, MoonIcon, SparklesIcon } from "../components/CelestialIcons";
-
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { PlanetIcon, MoonIcon, SparklesIcon } from "../components/CelestialIcons";
 
 export default function SalesLayout() {
   const [open, setOpen] = useState(false);
+  const location = useLocation();
 
   // Close drawer on ESC
   useEffect(() => {
@@ -14,7 +14,12 @@ export default function SalesLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // NavLink class helper (matches your .menu-link CSS and adds .is-active)
+  // Close drawer after navigation
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  // Matches your .menu-link /.is-active styles
   const linkClass = ({ isActive }) => "menu-link" + (isActive ? " is-active" : "");
 
   return (
@@ -36,8 +41,8 @@ export default function SalesLayout() {
         <div className="spacer" />
       </header>
 
-      {/* Drawer + Backdrop */}
-      {open && <div className="backdrop" onClick={() => setOpen(false)} />}
+      {/* Backdrop + Drawer */}
+      {open && <div className="backdrop" onClick={() => setOpen(false)} aria-hidden />}
       <aside className={`drawer ${open ? "open" : ""}`} aria-hidden={!open}>
         <div className="drawer-header">
           <div className="drawer-title">Navigation</div>
@@ -47,26 +52,25 @@ export default function SalesLayout() {
         </div>
 
         <ul className="menu">
-  <li>
-    <NavLink to="/sales/ringup" end className={linkClass} onClick={() => setOpen(false)}>
-      <PlanetIcon className="icon-20" />
-      <span>Ring Up</span>
-    </NavLink>
-  </li>
-  <li>
-    <NavLink to="/sales/snapshot" className={linkClass} onClick={() => setOpen(false)}>
-      <MoonIcon className="icon-20" />
-      <span>Snapshot</span>
-    </NavLink>
-  </li>
-  <li>
-    <NavLink to="/sales/catalog" className={linkClass} onClick={() => setOpen(false)}>
-      <SparklesIcon className="icon-20" />
-      <span>Catalog</span>
-    </NavLink>
-  </li>
-</ul>
-
+          <li>
+            <NavLink to="/sales/ringup" end className={linkClass}>
+              <PlanetIcon className="icon-20" />
+              <span>Ring Up</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/sales/snapshot" className={linkClass}>
+              <MoonIcon className="icon-20" />
+              <span>Snapshot</span>
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/sales/catalog" className={linkClass}>
+              <SparklesIcon className="icon-20" />
+              <span>Catalog</span>
+            </NavLink>
+          </li>
+        </ul>
       </aside>
 
       {/* Page content */}
@@ -78,6 +82,3 @@ export default function SalesLayout() {
     </div>
   );
 }
-
-
-

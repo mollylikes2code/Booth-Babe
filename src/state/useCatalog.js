@@ -1,80 +1,126 @@
 // src/state/useCatalog.js
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-// LocalStorage keys
-const LS_TYPES = "bb_catalog_types";
-const LS_PATTERNS = "bb_catalog_patterns";
-const LS_SERIES = "bb_catalog_series";
+/** ---- LocalStorage keys ---- */
+const LS_SERIES    = "bb_series";
+const LS_FABRICS   = "bb_fabrics";     // [{ id, series, pattern }]
+const LS_ITEMTYPES = "bb_itemTypes";   // [{ type, defaultPrice, notes }]
 
-// Reasonable defaults (used on first run only)
-const DEFAULT_TYPES = [
-  { id: crypto.randomUUID(), type: "Buttons", defaultPrice: 2 },
-  { id: crypto.randomUUID(), type: "Pouches", defaultPrice: 10 },
-  { id: crypto.randomUUID(), type: "Hat", defaultPrice: 15 },
-  { id: crypto.randomUUID(), type: "Wristlet", defaultPrice: 10 },
-  { id: crypto.randomUUID(), type: "Keychain", defaultPrice: 5 },
-  { id: crypto.randomUUID(), type: "Scrunchie", defaultPrice: 5 },
-  { id: crypto.randomUUID(), type: "Dreamcatcher", defaultPrice: 7 },
-];
-
-const DEFAULT_PATTERNS = [
-  "Mini Mouse","Dino Cookie","Pokemon","Space","Hazbin -- Charlie",
-  "MLP","Sailor Moon","Bluey","Carebear","Witchy",
-];
-
-const DEFAULT_SERIES = ["Core", "Seasonal", "Limited"];
-
-function safeParse(json, fallback) {
+function parse(json, fallback) {
   try { return json ? JSON.parse(json) : fallback; } catch { return fallback; }
 }
 
 export default function useCatalog() {
-  const [types, setTypes] = useState(() =>
-    safeParse(localStorage.getItem(LS_TYPES), DEFAULT_TYPES)
-  );
-  const [patterns, setPatterns] = useState(() =>
-    safeParse(localStorage.getItem(LS_PATTERNS), DEFAULT_PATTERNS)
-  );
+  // ----- State (load once) -----
   const [series, setSeries] = useState(() =>
-    safeParse(localStorage.getItem(LS_SERIES), DEFAULT_SERIES)
+    parse(localStorage.getItem(LS_SERIES), ["Core", "Holiday", "Limited", "Miscellaneous"])
   );
 
-  // persist
-  useEffect(() => localStorage.setItem(LS_TYPES, JSON.stringify(types)), [types]);
-  useEffect(() => localStorage.setItem(LS_PATTERNS, JSON.stringify(patterns)), [patterns]);
+  const [fabrics, setFabrics] = useState(() =>
+    parse(localStorage.getItem(LS_FABRICS), [
+      // starter examples (optional)
+      { id: crypto.randomUUID(), series: "Core",          pattern: "Pokemon" },
+      { id: crypto.randomUUID(), series: "Core",          pattern: "Sailor Moon" },
+      { id: crypto.randomUUID(), series: "Miscellaneous", pattern: "Space" },
+    ])
+  );
+
+  const [itemTypes, setItemTypes] = useState(() =>
+    parse(localStorage.getItem(LS_ITEMTYPES), [
+      { type: "Buttons",     defaultPrice: 2,  notes: "" },
+      { type: "Pouches",     defaultPrice: 10, notes: "" },
+      { type: "Hat",         defaultPrice: 15, notes: "" },
+      { type: "Wristlet",    defaultPrice: 10, notes: "" },
+      { type: "Keychain",    defaultPrice: 5,  notes: "" },
+      { type: "Scrunchie",   defaultPrice: 5,  notes: "" },
+      { type: "Dreamcatcher",defaultPrice: 7,  notes: "" },
+    ])
+  );
+
+  // ----- Persist -----
   useEffect(() => localStorage.setItem(LS_SERIES, JSON.stringify(series)), [series]);
+  useEffect(() => localStorage.setItem(LS_FABRICS, JSON.stringify(fabrics)), [fabrics]);
+  useEffect(() => localStorage.setItem(LS_ITEMTYPES, JSON.stringify(itemTypes)), [itemTypes]);
 
-  // helpers: Product Types (array of {id, type, defaultPrice})
-  const addType = (type, defaultPrice = 0) =>
-    setTypes((prev) => prev.concat({ id: crypto.randomUUID(), type: type.trim(), defaultPrice: Number(defaultPrice)||0 }));
+  // ----- Derived: fabrics grouped by series -----
+  const fabricsBySeries = useMemo(() => {
+    const map = new Map();
+    for (const f of fabrics) {
+      const k = f.series || "Miscellaneous";
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(f);
+    }
+    return Array.from(map.entries())
+      .sort(([a],[b]) => a.localeCompare(b))
+      .map(([key, list]) => [key, list.sort((a,b)=>a.pattern.localeCompare(b.pattern))]);
+  }, [fabrics]);
 
-  const updateType = (id, patch) =>
-    setTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  // ----- Derived: flattened options for RingUp -----
+  const fabricOptions = useMemo(() => {
+    return [...fabrics]
+      .sort((a, b) => {
+        const sa = a.series.localeCompare(b.series);
+        return sa !== 0 ? sa : a.pattern.localeCompare(b.pattern);
+      })
+      .map(f => ({
+        id: f.id,
+        series: f.series || "Miscellaneous",
+        pattern: f.pattern,
+        label: `${f.series || "Miscellaneous"} — ${f.pattern}`,
+      }));
+  }, [fabrics]);
 
-  const deleteType = (id) => setTypes((prev) => prev.filter((t) => t.id !== id));
+  // ----- Actions -----
+  function ensureSeries(name) {
+    const s = (name || "").trim() || "Miscellaneous";
+    if (!series.includes(s)) setSeries(prev => [...prev, s]);
+    return s;
+  }
 
-  // helpers: Patterns (array of strings)
-  const addPattern = (name) =>
-    setPatterns((prev) => [...new Set(prev.concat(name.trim()))].filter(Boolean));
-  const renamePattern = (oldName, newName) =>
-    setPatterns((prev) => prev.map((p) => (p === oldName ? newName.trim() : p)));
-  const deletePattern = (name) =>
-    setPatterns((prev) => prev.filter((p) => p !== name));
+  function addFabric({ series: s, pattern }) {
+    const pat = String(pattern || "").trim();
+    const normalizedSeries = ensureSeries(s);
+    if (!pat) return;
 
-  // helpers: Series (array of strings)
-  const addSeries = (name) =>
-    setSeries((prev) => [...new Set(prev.concat(name.trim()))].filter(Boolean));
-  const renameSeries = (oldName, newName) =>
-    setSeries((prev) => prev.map((s) => (s === oldName ? newName.trim() : s)));
-  const deleteSeries = (name) =>
-    setSeries((prev) => prev.filter((s) => s !== name));
+    const exists = fabrics.some(
+      f => f.series === normalizedSeries && f.pattern.toLowerCase() === pat.toLowerCase()
+    );
+    if (exists) return;
 
-  // quick maps for selects
-  const typeNames = useMemo(() => types.map((t) => t.type), [types]);
+    setFabrics(prev => [...prev, { id: crypto.randomUUID(), series: normalizedSeries, pattern: pat }]);
+  }
+
+  function removeFabric(id) {
+    setFabrics(prev => prev.filter(f => f.id !== id));
+  }
+
+  function addItemType({ type, defaultPrice = 0, notes = "" }) {
+    const t = String(type || "").trim();
+    const price = Number(defaultPrice) || 0;
+    const n = String(notes || "");
+    if (!t) return;
+
+    const exists = itemTypes.some(it => it.type.toLowerCase() === t.toLowerCase());
+    if (!exists) setItemTypes(prev => [...prev, { type: t, defaultPrice: price, notes: n }]);
+  }
+
+  function removeItemType(type) {
+    const key = String(type || "").toLowerCase();
+    setItemTypes(prev => prev.filter(it => it.type.toLowerCase() !== key));
+  }
 
   return {
-    types, typeNames, addType, updateType, deleteType,
-    patterns, addPattern, renamePattern, deletePattern,
-    series, addSeries, renameSeries, deleteSeries,
+    // data
+    series,
+    fabrics,
+    itemTypes,
+    fabricsBySeries,
+    fabricOptions,
+
+    // mutations
+    addFabric,
+    removeFabric,
+    addItemType,
+    removeItemType,
   };
 }

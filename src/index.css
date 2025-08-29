@@ -608,3 +608,12 @@ html, body, #root { overflow-x: hidden; }
   .toolbar { flex-direction: column; gap: 8px; }
   input, select, button { min-height: 44px; font-size: 16px; }
 }
+/* ===== Catalog layout helpers ===== */
+.actions-right { display: flex; gap: 8px; margin-left: auto; }
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 900px) { .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .grid-3 { grid-template-columns: 1fr; } }

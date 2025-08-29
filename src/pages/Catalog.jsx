@@ -1,176 +1,183 @@
 // src/pages/Catalog.jsx
-import { useState } from "react";
+import React, { useState } from "react";
 import useCatalog from "../state/useCatalog";
 
 export default function Catalog() {
   const {
-    patterns, series,
-    addPattern, removePattern,
-    addSeries,  removeSeries,
+    series,
+    fabricsBySeries,
+    addFabric,
+    removeFabric,
+    itemTypes,
+    addItemType,
+    removeItemType,
   } = useCatalog();
 
+  const [mode, setMode] = useState(null); // "fabric" | "item" | null
+
+  // Fabric form state
+  const [fabricSeries, setFabricSeries] = useState("");
+  const [fabricPattern, setFabricPattern] = useState("");
+
+  // Item Type form state
+  const [itType, setItType] = useState("");
+  const [itPrice, setItPrice] = useState("");
+  const [itNotes, setItNotes] = useState("");
+
+  function submitFabric(e) {
+    e.preventDefault();
+    addFabric({ series: fabricSeries || "Miscellaneous", pattern: fabricPattern });
+    setFabricPattern("");
+  }
+
+  function submitItemType(e) {
+    e.preventDefault();
+    addItemType({ type: itType, defaultPrice: itPrice, notes: itNotes });
+    setItType("");
+    setItPrice("");
+    setItNotes("");
+  }
+
   return (
-    <div className="wrap">
-      <h1>Booth Babe – Catalog</h1>
+    <div className="grid gap-4">
+      {/* Right-aligned buttons */}
+      <div className="actions-right">
+        <button className="primary" onClick={() => setMode("fabric")}>[ + ] Add New Fabric</button>
+        <button className="primary" onClick={() => setMode("item")}>[ + ] Add New Item Type</button>
+      </div>
 
-      {/* Header / tools */}
-      <section className="card">
+      {mode === "fabric" && (
+        <form className="card" onSubmit={submitFabric}>
+          <div className="toolbar">
+            <h2>Add New Fabric</h2>
+            <button type="button" className="secondary" onClick={() => setMode(null)}>Close</button>
+          </div>
+
+          <div className="row">
+            <label>Series</label>
+            <input
+              list="series-list"
+              placeholder="e.g., Core, Holiday… (defaults to Miscellaneous)"
+              value={fabricSeries}
+              onChange={(e) => setFabricSeries(e.target.value)}
+            />
+            <datalist id="series-list">
+              {series.map(s => <option key={s} value={s} />)}
+            </datalist>
+          </div>
+
+          <div className="row">
+            <label>Pattern</label>
+            <input
+              placeholder="Name Cat recognizes (e.g., Twilight Sparkle Tie-dye)"
+              value={fabricPattern}
+              onChange={(e) => setFabricPattern(e.target.value)}
+              required
+            />
+          </div>
+
+          <button className="success">Save Fabric</button>
+        </form>
+      )}
+
+      {mode === "item" && (
+        <form className="card" onSubmit={submitItemType}>
+          <div className="toolbar">
+            <h2>Add New Item Type</h2>
+            <button type="button" className="secondary" onClick={() => setMode(null)}>Close</button>
+          </div>
+
+          <div className="row">
+            <label>Item Type</label>
+            <input
+              placeholder="e.g., Bucket Hat, Keychain, Scrunchie"
+              value={itType}
+              onChange={(e) => setItType(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="row">
+            <label>Default Price</label>
+            <input
+              type="number"
+              step="0.01"
+              placeholder="e.g., 10.00"
+              value={itPrice}
+              onChange={(e) => setItPrice(e.target.value)}
+            />
+          </div>
+
+          <div className="row">
+            <label>Notes</label>
+            <input
+              placeholder="Where fabric was bought, order #, etc."
+              value={itNotes}
+              onChange={(e) => setItNotes(e.target.value)}
+            />
+          </div>
+
+          <button className="success">Save Item Type</button>
+        </form>
+      )}
+
+      {/* Fabrics grouped by Series — 3 across grid */}
+      <div className="card">
         <div className="toolbar">
-          <h2>Catalog Manager</h2>
+          <h2>Fabrics by Series</h2>
         </div>
-        <p className="muted">
-          Manage the lists Cat will pick from while ringing up sales. 
-          Changes are saved to this device automatically.
-        </p>
-      </section>
 
-      {/* Patterns */}
-      <Section title="Patterns">
-        <AddOne placeholder="Add a pattern…" onAdd={addPattern} />
-        <EditableList
-          rows={patterns}
-          onRename={(oldVal, newVal) => {
-            if (!newVal || newVal.trim() === oldVal) return;
-            removePattern(oldVal);
-            addPattern(newVal.trim());
-          }}
-          onDelete={removePattern}
-          emptyHint="No patterns yet — add some above."
-        />
-      </Section>
+        {fabricsBySeries.length === 0 ? (
+          <p className="muted">No fabrics yet — add your first one with “Add New Fabric”.</p>
+        ) : (
+          <div className="grid-3">
+            {fabricsBySeries.map(([seriesName, list]) => (
+              <div key={seriesName} className="rounded-2xl p-4 bg-white/5 border border-white/10">
+                <div className="text-sm font-medium mb-2">{seriesName}</div>
+                <ul className="text-sm divide-y divide-white/10">
+                  {list.map(f => (
+                    <li key={f.id} className="py-2 flex items-center justify-between gap-3">
+                      <span>{f.pattern}</span>
+                      <button className="danger" onClick={() => removeFabric(f.id)}>Delete</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Series */}
-      <Section title="Series">
-        <AddOne placeholder="Add a series…" onAdd={addSeries} />
-        <EditableList
-          rows={series}
-          onRename={(oldVal, newVal) => {
-            if (!newVal || newVal.trim() === oldVal) return;
-            removeSeries(oldVal);
-            addSeries(newVal.trim());
-          }}
-          onDelete={removeSeries}
-          emptyHint="No series yet — add some above."
-        />
-      </Section>
-
-      {/* Optional note */}
-      <section className="card">
+      {/* Item types list (quick view) */}
+      <div className="card">
         <div className="toolbar">
-          <h3>Coming soon: Product Types & Default Prices</h3>
+          <h2>Item Types</h2>
         </div>
-        <p className="muted">
-          If you want Cat to manage product types and default prices here too, 
-          we’ll extend <code>useCatalog.js</code> to include a <code>types</code> list. 
-          For tonight, patterns and series are editable.
-        </p>
-      </section>
+        {itemTypes.length === 0 ? (
+          <p className="muted">No item types yet — add one above.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Item Type</th>
+                <th>Default Price</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {itemTypes.map(it => (
+                <tr key={it.type}>
+                  <td>{it.type}</td>
+                  <td>${Number(it.defaultPrice || 0).toFixed(2)}</td>
+                  <td>{it.notes || ""}</td>
+                  <td><button className="danger" onClick={() => removeItemType(it.type)}>Delete</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
-  );
-}
-
-/* ---------- Reusable bits ---------- */
-
-function Section({ title, children }) {
-  return (
-    <section className="card">
-      <div className="toolbar">
-        <h2>{title}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function AddOne({ placeholder, onAdd }) {
-  const [val, setVal] = useState("");
-  return (
-    <form
-      className="row"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const v = (val || "").trim();
-        if (!v) return;
-        onAdd(v);
-        setVal("");
-      }}
-    >
-      <div className="inline">
-        <input
-          placeholder={placeholder}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-        />
-        <button className="primary" type="submit">Add</button>
-      </div>
-    </form>
-  );
-}
-
-function EditableList({ rows = [], onRename, onDelete, emptyHint }) {
-  if (!rows.length) return <p className="muted">{emptyHint}</p>;
-  return (
-    <table>
-      <tbody>
-        {rows.map((name) => (
-          <EditableRow
-            key={name}
-            name={name}
-            onRename={onRename}
-            onDelete={onDelete}
-          />
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function EditableRow({ name, onRename, onDelete }) {
-  const [edit, setEdit] = useState(false);
-  const [val, setVal] = useState(name);
-
-  return (
-    <tr>
-      <td style={{ width: "100%" }}>
-        {edit ? (
-          <input value={val} onChange={(e) => setVal(e.target.value)} />
-        ) : (
-          <span>{name}</span>
-        )}
-      </td>
-      <td style={{ width: 180 }}>
-        {edit ? (
-          <>
-            <button
-              className="success"
-              onClick={() => {
-                if (val.trim()) onRename(name, val.trim());
-                setEdit(false);
-              }}
-            >
-              Save
-            </button>{" "}
-            <button
-              className="secondary"
-              onClick={() => {
-                setVal(name);
-                setEdit(false);
-              }}
-            >
-              Cancel
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="secondary" onClick={() => setEdit(true)}>
-              Edit
-            </button>{" "}
-            <button className="danger" onClick={() => onDelete(name)}>
-              Delete
-            </button>
-          </>
-        )}
-      </td>
-    </tr>
   );
 }
